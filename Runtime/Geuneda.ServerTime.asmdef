@@ -1,0 +1,19 @@
+{
+    "name": "Geuneda.ServerTime",
+    "rootNamespace": "Geuneda.ServerTime",
+    "references": [
+        "Geuneda.Core",
+        "Geuneda.Services",
+        "Geuneda.Http",
+        "UniTask"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

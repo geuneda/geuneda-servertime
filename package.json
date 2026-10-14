@@ -1,0 +1,17 @@
+{
+  "name": "com.geuneda.servertime",
+  "displayName": "Geuneda Server Time",
+  "author": "geuneda",
+  "version": "0.1.0",
+  "unity": "6000.3",
+  "license": "MIT",
+  "description": "서버 시간 동기화입니다. 시간 원천(NTP, HTTPS Date 헤더, 직접 구현)을 순서대로 시도해 왕복 지연을 보정한 서버 시각을 services 의 ITimeService 기준점으로 넣고, 실패하면 지수 백오프로 재시도, 성공하면 주기적으로, 앱이 포그라운드로 돌아오면 바로 다시 맞춥니다. 현재 시각은 core 의 잠자기 포함 단조 시계로 진행하므로 기기 시계를 바꿔도 영향받지 않습니다.",
+  "type": "library",
+  "hideInEditor": false,
+  "dependencies": {
+    "com.geuneda.core": "0.4.0",
+    "com.geuneda.services": "5.0.0",
+    "com.geuneda.http": "0.1.0",
+    "com.cysharp.unitask": "2.5.10"
+  }
+}
