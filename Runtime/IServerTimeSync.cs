@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Geuneda.Core;
@@ -7,12 +8,14 @@ using Geuneda.Core;
 namespace Geuneda.ServerTime
 {
 	/// <summary>
-	/// 시간 원천으로 서버 시각을 가져와 services 의 시간 서비스(<c>ITimeManipulator</c>)를 맞춥니다. 기본 구현은 <see cref="ServerTimeSync"/> 입니다.
+	/// 시간 원천으로 서버 시각을 가져와 services 의 시간 서비스(<c>ITimeManipulator</c>)를 맞춥니다. 기본 구현은 <see cref="ServerTimeSync"/> 이고,
+	/// services 의 <c>MainInstaller</c> 에 이 인터페이스로 바인딩합니다(정리는 <c>MainInstaller.CleanDispose&lt;IServerTimeSync&gt;()</c>).
 	/// </summary>
 	/// <remarks>
 	/// 맞췄는지는 <c>ITimeService.IsServerTime</c>, 시각이 바뀐 것은 <c>ITimeService.TimeAdjusted</c> 로 봅니다. 메인 스레드에서 부릅니다.
+	/// <see cref="IDisposable.Dispose"/> 는 <see cref="Stop"/> 과 같고 여러 번 불러도 됩니다.
 	/// </remarks>
-	public interface IServerTimeSync
+	public interface IServerTimeSync : IDisposable
 	{
 		/// <summary>
 		/// 원천을 순서대로 시도해 처음 성공한 표본으로 시간 서비스를 맞춥니다. 모두 실패하면 첫 실패 코드와 원천별 실패 내용을 돌려줍니다.

@@ -66,6 +66,13 @@ public static class Bootstrap
 
         sync.Start();
     }
+
+    // initialization: InitializeAsync 에 토큰을 넘긴 소스
+    public static void Shutdown(CancellationTokenSource initialization)
+    {
+        initialization.Cancel();                         // 초기화 중이면 직접 부른 SyncAsync 를 취소하고 Start 하지 않게 함(Dispose 는 이 요청을 취소하지 않음)
+        MainInstaller.CleanDispose<IServerTimeSync>();   // Start 가 시작한 백그라운드 동기화 멈춤(진행 중인 요청 취소), 바인딩 제거
+    }
 }
 ```
 
@@ -76,7 +83,7 @@ public static class Bootstrap
 - **원천 순서**: 목록 순서대로 시도해 처음 성공한 표본을 씁니다. 모두 실패하면 첫 실패 코드와 원천별 실패 내용을 돌려줍니다. 원천이 결과 대신 던진 예외(버그·오용)는 숨기지 않습니다. `SyncAsync` 는 그대로 던지고, 백그라운드 동기화는 Error 로그를 남기고 멈춥니다(다시 시도해도 고쳐지지 않으므로).
 - **왕복 보정**: 표본은 "응답을 받은 순간의 서버 시각 추정값"과 그 순간의 단조 시계 값입니다. 적용할 때 받은 뒤 흐른 시간을 더해 `ITimeManipulator.SetServerTime` 에 넣습니다. 왕복이 `MaxRoundTrip`(기본 10초)보다 긴 표본은 버립니다. 응답을 기다리는 동안 앱이 백그라운드에 있었던 표본은 추정이 크게 틀리기 때문입니다.
 - **백그라운드 동기화(`Start`)**: 아직 맞춘 적 없으면 바로 맞춥니다. 실패하면 `RetryDelay`(기본 5초)부터 두 배씩 `MaxRetryDelay`(기본 5분)까지 기다렸다 다시 시도합니다(대기는 상한의 50~100% 무작위). 성공하면 `ResyncInterval`(기본 30분)마다 다시 맞춥니다. 앱이 포그라운드로 돌아오면(`OnApplicationPause(false)`) 기다리던 중이면 바로, 맞추는 중이면 끝난 뒤 한 번 더 맞추고 재시도 간격을 처음으로 되돌립니다. 설정 최솟값은 `ResyncInterval` 1초, `RetryDelay` 100ms 입니다(대기가 0 이 되어 메인 스레드를 양보하지 않고 도는 것을 막음).
-- **멈춤**: `Stop()`/`Dispose()` 로 멈춥니다. 앱이 끝나거나(에디터에서는 플레이를 멈출 때) 숨은 수명 오브젝트가 파괴되면 스스로 멈추므로, 도메인 리로드를 끈 에디터에서도 이전 플레이의 동기화가 남지 않습니다.
+- **멈춤**: `Stop()`/`Dispose()` 로 멈춥니다. `IServerTimeSync` 는 `IDisposable` 이라 `MainInstaller.CleanDispose<IServerTimeSync>()` 로 멈추고 바인딩을 지울 수 있습니다(0.2.0). `Dispose` 는 `Stop` 과 같고 여러 번 불러도 됩니다. `Stop`·`Dispose` 는 `Start` 가 시작한 백그라운드 동기화만 멈춥니다. 직접 부른 `SyncAsync` 는 그 호출에 넘긴 토큰으로 취소하므로, 초기화 중에 종료할 때는 초기화 토큰을 먼저 취소합니다(위 `Shutdown`). 앱이 끝나거나(에디터에서는 플레이를 멈출 때) 숨은 수명 오브젝트가 파괴되면 스스로 멈추므로, 도메인 리로드를 끈 에디터에서도 이전 플레이의 동기화가 남지 않습니다.
 - **시계**: 시간 서비스와 동기화가 같은 단조 시계를 써야 합니다. 둘 다 기본 생성자면 core `MonotonicClock` 입니다. 이 시계는 Android·iOS·macOS 에서 기기가 잠든 동안에도 흐르므로, 오프라인으로 돌아와도 서버 시각이 뒤처지지 않습니다.
 - **스레드**: 메인 스레드에서 부릅니다. 원천이 다른 스레드에서 끝나도 메인 스레드로 돌아와 시간 서비스를 바꿉니다.
 - 재동기화로 현재 시각이 조금 뒤로 갈 수 있습니다(`TimeAdjusted` 의 음수 값).

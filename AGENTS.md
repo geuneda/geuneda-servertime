@@ -34,6 +34,7 @@
 - **WebGL**: `NtpTimeSource` 는 스레드 풀·UDP 가 없어 바로 `NetworkError` 입니다(기다리면 다음 원천으로 넘어가지 못함).
 - 결과 코드는 6000 블록(core README 범위 표에 등록). 값은 바꾸거나 재사용하지 않습니다.
 - static 가변 상태 금지(D2). 인스턴스로 만들어 `MainInstaller` 에 인터페이스로 바인딩합니다.
+- **수명**: `IServerTimeSync` 는 `IDisposable` 입니다(0.2.0, `MainInstaller.CleanDispose<IServerTimeSync>()`). `Dispose` 는 `Stop` 과 같고 여러 번 불러도 됩니다. 0.1.0 은 구현 클래스만 `IDisposable` 이라 `CleanDispose` 를 쓸 수 없었습니다(2026-10-17, 호환성 shim 없이 0.2.0 으로 올림).
 
 ## 4. 테스트
 
@@ -41,7 +42,7 @@
   - `NtpPacketTest`: 요청 형식, 왕복·서버 처리 보정 계산(틱으로 정확한 값), 버전 3·긴 패킷, 음수 구간 0 처리, 짧은 패킷·클라이언트 모드·버전 2·윤초 표시 3·계층 16·Kiss-o'-Death·originate 불일치·타임스탬프 없음·2024년 이전 거절, 두 시대 변환. 테스트용 `ToTimestamp` 는 올림이어야 `ToDateTime`(내림)과 왕복이 맞습니다. `AddSeconds`/`FromSeconds` 는 Mono 에서 밀리초로 반올림하므로 틱으로 값을 만듭니다
   - `NtpTimeSourceTest`: 127.0.0.1 가짜 UDP 서버(`FakeNtpServer`)로 실제 소켓·스레드 풀 경로, 메인 스레드 복귀, 응답 없음 → `Timeout`(20번 반복. 취소 결과·취소 예외 경쟁은 이 반복으로 재현되지 않아 `ClassifyCancellation` 을 직접 확인), 1ms 제한 시간 100번(교착 회귀, 확률적), 작업 예외가 기다리는 호출자에게 메인 스레드에서 전파, 작업이 시계에 들어온 뒤 호출자가 취소하고 작업이 나중에 던지면 Error 로그(`FailingClock.Entered`/`Gate` 로 순서 고정), originate 불일치·쓰레기 → `InvalidResponse`, 호출자 취소, 미리 취소(보내지 않음), `.invalid` 호스트 → `NetworkError`
   - `HttpDateTimeSourceTest`: 가짜 `IHttpClient`(지연 동안 가짜 시계 진행)로 `HEAD`·헤더·제한 시간, 0.5초 + 왕복 절반, 오류 상태도 사용, 없음·옛 형식·잘못된 형식·2024년 이전 거절, 전송 실패 코드 유지. 로컬 `HttpListener` 와 실제 UnityWebRequest 로 `HEAD` 의 `Date` 읽기
-  - `ServerTimeSyncTest`: 가짜 원천·시계·지연(`ManualDelay`, 동기 진행)으로 순서·대체·전부 실패·받은 뒤 경과 더하기·긴 왕복 거절·원천 예외·취소, 스레드 풀에서 끝난 원천의 메인 스레드 적용, 시작 동기화와 재동기화 간격, 수동 동기화 뒤 남은 간격, 지수 백오프와 상한, 무작위 하한, 복구, 대기 중·동기화 중 포그라운드 복귀, 일시정지 없는 복귀 무시(가드), 백오프 초기화, Stop 의 진행 중 요청 취소, Stop 뒤 Start
+  - `ServerTimeSyncTest`: 가짜 원천·시계·지연(`ManualDelay`, 동기 진행)으로 순서·대체·전부 실패·받은 뒤 경과 더하기·긴 왕복 거절·원천 예외·취소, 스레드 풀에서 끝난 원천의 메인 스레드 적용, 시작 동기화와 재동기화 간격, 수동 동기화 뒤 남은 간격, 지수 백오프와 상한, 무작위 하한, 복구, 대기 중·동기화 중 포그라운드 복귀, 일시정지 없는 복귀 무시(가드), 백오프 초기화, Stop 의 진행 중 요청 취소, Stop 뒤 Start, `MainInstaller.CleanDispose<IServerTimeSync>()` 가 진행 중인 요청을 취소하고 멈추고 바인딩을 지움, `Dispose` 두 번
     - 리뷰 회귀(2026-10-14): 원천 예외가 `SyncAsync` 로 던져지고 다음 원천을 시도하지 않음, 스레드 풀에서 던진 예외도 메인 스레드에서 받음, 루프는 Error 로그 후 멈추고 다시 `Start` 가능, 최소 설정에서도 대기가 0 이 아님, 설정 최솟값 거절, 취소 콜백 안의 `Stop`·`Start` 뒤에도 새 실행을 멈출 수 있음, 콜백 예외 뒤에도 멈춰 있고 다시 시작 가능, 옛 실행의 `EndRun` 이 새 실행을 멈추지 않음
-- `Tests/PlayMode/` (`Geuneda.ServerTime.Tests.PlayMode`, `ServerTimeSyncLifecycleTest`): 실제 플레이 모드에서 시작 직후 몇 프레임 동안 한 번만 맞춤, 일시정지·복귀 메시지로 다시 맞춤, 수명 오브젝트 파괴·`OnApplicationQuit` 이 실행을 멈추고 오브젝트를 파괴함, `Stop` 뒤 `Start` 하면 옛 오브젝트의 늦은 파괴가 새 실행을 멈추지 않음, 숨김 플래그가 `HideInHierarchy`
+- `Tests/PlayMode/` (`Geuneda.ServerTime.Tests.PlayMode`, `ServerTimeSyncLifecycleTest`): 실제 플레이 모드에서 시작 직후 몇 프레임 동안 한 번만 맞춤, 일시정지·복귀 메시지로 다시 맞춤, 수명 오브젝트 파괴·`OnApplicationQuit`·`MainInstaller.CleanDispose<IServerTimeSync>()` 가 실행을 멈추고 오브젝트를 파괴함, `Stop` 뒤 `Start` 하면 옛 오브젝트의 늦은 파괴가 새 실행을 멈추지 않음, 숨김 플래그가 `HideInHierarchy`
 - 기기 확인(2026-10-14): Android 13 에뮬레이터(IL2CPP, High 코드 제거)와 iOS 27 시뮬레이터에서 실제 `time.google.com` NTP, `https://www.google.com` `HEAD` Date, `SyncAsync` 성공과 메인 스레드 복귀, 없는 호스트 `NetworkError`

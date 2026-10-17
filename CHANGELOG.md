@@ -4,6 +4,11 @@
 이 형식은 [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)를 기반으로 하며,
 이 프로젝트는 [Semantic Versioning](http://semver.org/spec/v2.0.0.html)을 따릅니다.
 
+## [0.2.0] - 2026-10-17
+
+**Changed**:
+- **호환되지 않는 변경**: `IServerTimeSync` 가 `IDisposable` 을 상속합니다. 이제 `MainInstaller.CleanDispose<IServerTimeSync>()` 로 백그라운드 동기화를 멈추고(진행 중인 요청 취소, 숨은 수명 오브젝트 파괴) 바인딩을 지울 수 있습니다. 0.1.0 에서는 구현 클래스만 `IDisposable` 이라 이 호출이 컴파일되지 않았습니다. `IServerTimeSync` 를 직접 구현한 클래스(테스트 가짜 포함)는 `Dispose()` 를 구현해야 합니다. `Dispose` 는 전과 같이 `Stop` 과 같고 여러 번 불러도 됩니다. `ServerTimeSync` 의 동작은 바뀌지 않았습니다.
+
 ## [0.1.0] - 2026-10-14
 
 **New**:

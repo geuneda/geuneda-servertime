@@ -30,7 +30,7 @@ namespace Geuneda.ServerTime
 	/// 백그라운드 동기화는 앱이 끝나거나(에디터에서는 플레이를 멈출 때) 숨은 수명 오브젝트가 파괴되면 스스로 멈춥니다.
 	/// </para>
 	/// </remarks>
-	public sealed class ServerTimeSync : IServerTimeSync, IDisposable
+	public sealed class ServerTimeSync : IServerTimeSync
 	{
 		private static readonly ModuleLogger Logger = new ModuleLogger("Geuneda.ServerTime");
 
@@ -187,6 +187,7 @@ namespace Geuneda.ServerTime
 			run.Cancel();
 		}
 
+		/// <summary><see cref="Stop"/> 과 같습니다. 여러 번 불러도 됩니다.</summary>
 		public void Dispose()
 		{
 			Stop();

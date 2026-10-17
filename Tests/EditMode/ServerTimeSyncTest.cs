@@ -61,6 +61,7 @@ namespace Geuneda.ServerTime.Tests
 		public void TearDown()
 		{
 			_sync?.Dispose();
+			MainInstaller.Clean<IServerTimeSync>();
 			Log.Sink = _originalSink;
 		}
 
@@ -509,6 +510,44 @@ namespace Geuneda.ServerTime.Tests
 			Assert.AreEqual(1, _ntp.Calls);
 			Assert.AreEqual(0, _delay.Requested.Count);
 			Assert.IsFalse(_delay.IsWaiting);
+		}
+
+		[Test]
+		public void CleanDispose_StopsTheRunCancelsTheFetchAndRemovesTheBinding()
+		{
+			var pending = new UniTaskCompletionSource<Result<ServerTimeSample>>();
+			_ntp.Handler = (_, token) =>
+			{
+				token.Register(() => pending.TrySetResult(Result<ServerTimeSample>.Fail(ResultCodes.Cancelled, "cancelled")));
+				return pending.Task;
+			};
+			var sync = Create(null, _ntp);
+			MainInstaller.Bind<IServerTimeSync>(sync);
+			sync.Start();
+
+			Assert.IsTrue(MainInstaller.CleanDispose<IServerTimeSync>());
+
+			Assert.IsTrue(_ntp.LastToken.IsCancellationRequested, "the fetch in flight is cancelled");
+			Assert.IsNull(sync.Running);
+			Assert.AreEqual(1, _ntp.Calls);
+			Assert.AreEqual(0, _delay.Requested.Count, "the loop does not wait for the next sync");
+			Assert.IsFalse(MainInstaller.TryResolve<IServerTimeSync>(out _));
+		}
+
+		[Test]
+		public void Dispose_Twice_IsSafeAndKeepsTheRunStopped()
+		{
+			_ntp.Handler = FakeSource.Returns(ServerNow);
+			IServerTimeSync sync = Create(null, _ntp);
+			sync.Start();
+			Assert.IsTrue(_delay.IsWaiting);
+
+			sync.Dispose();
+			Assert.DoesNotThrow(() => sync.Dispose());
+
+			Assert.IsNull(_sync.Running);
+			Assert.IsFalse(_delay.IsWaiting);
+			Assert.AreEqual(1, _ntp.Calls);
 		}
 
 		[Test]

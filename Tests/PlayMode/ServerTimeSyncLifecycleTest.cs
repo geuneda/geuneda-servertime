@@ -44,6 +44,7 @@ namespace Geuneda.ServerTime.Tests
 		public void TearDown()
 		{
 			_sync?.Dispose();
+			MainInstaller.Clean<IServerTimeSync>();
 		}
 
 		private ServerTimeSync Create(CountingSource source)
@@ -110,6 +111,23 @@ namespace Geuneda.ServerTime.Tests
 
 			// 에디터에서는 플레이를 멈출 때 OnApplicationQuit 이 옵니다
 			lifecycle.SendMessage("OnApplicationQuit");
+			yield return null;
+
+			Assert.IsTrue(source.LastToken.IsCancellationRequested);
+			Assert.IsNull(sync.Running);
+			Assert.IsTrue(lifecycle == null, "the hidden object is destroyed");
+		}
+
+		[UnityTest]
+		public IEnumerator CleanDispose_StopsTheRunAndDestroysTheObject()
+		{
+			var source = new CountingSource { Hang = true };
+			var sync = Create(source);
+			MainInstaller.Bind<IServerTimeSync>(sync);
+			sync.Start();
+			var lifecycle = sync.LifecycleObject;
+
+			Assert.IsTrue(MainInstaller.CleanDispose<IServerTimeSync>());
 			yield return null;
 
 			Assert.IsTrue(source.LastToken.IsCancellationRequested);
